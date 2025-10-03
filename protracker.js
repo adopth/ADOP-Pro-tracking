@@ -1,6 +1,6 @@
 /**
  * SSP ProTracker for Google Analytics 4 (with Custom Publisher Logic)
- * Version: 18.0.0
+ * Version: 18.0.1
  *
  * This version includes a custom handler for 'thestandard.co' to accommodate
  * their unique HTML structure, while maintaining default behavior for all other sites.
