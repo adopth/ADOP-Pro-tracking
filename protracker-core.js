@@ -1,14 +1,16 @@
 /**
- * SSP ProTracker Core
- * Version: 18.1.0 (Final)
- * This is the main tracking script with all logic.
+ * SSP ProTracker for Google Analytics 4
+ * Version: 19.0.0 - Per-Creative Ad Request Logic
+ *
+ * This version sends an 'ad_request' for each individual creative found
+ * within a carousel/slider, providing more granular request data.
  */
 (function() {
     'use strict';
 
     const measurementId = 'G-VVLDGSNSL7';
 
-    // --- Core Functions & Initialization ---
+    // --- 1. Core Functions & Initialization (No changes) ---
     const configTag = document.querySelector('meta[name="adopstats"]');
     const pageLevelData = {
         pub: (configTag && configTag.dataset.pub) || '',
@@ -18,7 +20,6 @@
         cat: (configTag && configTag.dataset.category) || '',
     };
     const pageCategories = pageLevelData.cat.split(',').map(c => c.trim()).filter(Boolean);
-
     function initializeGtag() {
         if (window.gtag) return;
         window.dataLayer = window.dataLayer || [];
@@ -30,17 +31,14 @@
         document.head.appendChild(gtagScript);
         gtag('config', measurementId, { 'send_page_view': false });
     }
-
     function sendEvent(eventName, eventData) {
         if (!window.gtag) return;
         const dataToSend = { ...pageLevelData, ...eventData, 'send_to': measurementId };
         window.gtag('event', eventName, dataToSend);
     }
-
     function trackPageview() {
         sendEvent('page_view', {});
     }
-
     function observeVisibility(elementToObserve, impressionData) {
         const observer = new IntersectionObserver((entries, observerInstance) => {
             entries.forEach(entry => {
@@ -53,7 +51,8 @@
         observer.observe(elementToObserve);
     }
 
-    // --- TheStandard Handlers ---
+    // --- 2. Publisher Handlers ---
+    // **UPDATED** Custom handler for The Standard
     function theStandardHandler() {
         const container = document.querySelector('.banner-slider');
         if (!container) return false;
@@ -61,67 +60,84 @@
         const campaignContainer = container.querySelector('.adsMasthead');
         if (!campaignContainer) return false;
 
-        const desktopCreative = campaignContainer.querySelector('.hidden-xs');
-        const mobileCreative = campaignContainer.querySelector('.visible-xs');
+        const creatives = [
+            campaignContainer.querySelector('.hidden-xs'),
+            campaignContainer.querySelector('.visible-xs')
+        ].filter(Boolean);
 
-        const baseData = {
-            inv: container.dataset.inventory || 'AdMasthead',
-            ad_campaign: campaignContainer.dataset.adCampaign || 'GeneralCampaign',
-        };
+        if (creatives.length === 0) return false;
 
-        if (pageCategories.length > 0) {
-            pageCategories.forEach(cat => sendEvent('ad_request', { ...baseData, cat: cat }));
-        } else {
-            sendEvent('ad_request', baseData);
-        }
+        creatives.forEach(creative => {
+            const creativeData = {
+                inv: container.dataset.inventory || 'AdMasthead',
+                ad_campaign: creative.dataset.adCampaign || campaignContainer.dataset.adCampaign || 'adsMasthead',
+                ad_creative: creative.dataset.adCreative || (creative.classList.contains('hidden-xs') ? 'Desktop' : 'Mobile'),
+            };
 
-        if (desktopCreative) {
-            const desktopImpressionData = { ...baseData, ad_creative: desktopCreative.dataset.adCreative || 'Desktop' };
-            observeVisibility(desktopCreative, desktopImpressionData);
-        }
-        if (mobileCreative) {
-            const mobileImpressionData = { ...baseData, ad_creative: mobileCreative.dataset.adCreative || 'Mobile' };
-            observeVisibility(mobileCreative, mobileImpressionData);
-        }
+            if (pageCategories.length > 0) {
+                pageCategories.forEach(cat => sendEvent('ad_request', { ...creativeData, cat: cat }));
+            } else {
+                sendEvent('ad_request', creativeData);
+            }
+
+            observeVisibility(creative, creativeData);
+        });
+        
         return true;
     }
 
     function defaultHandler() {
         function processAdSlot(slotElement) {
-            const slotData = {
-                inv: slotElement.dataset.inventory || '',
-                ad_campaign: slotElement.dataset.adCampaign || '',
-                ad_creative: slotElement.dataset.adCreative || '',
-            };
-
-            sendEvent('ad_request', slotData); // Category is automatically added by sendEvent
-
             const creatives = slotElement.querySelectorAll('.ssp-creative');
-            const positionStyle = window.getComputedStyle(slotElement).position;
-            const isStickyOrFixed = positionStyle === 'sticky' || positionStyle === 'fixed';
 
             if (creatives.length > 0) {
                 creatives.forEach(creative => {
                     const creativeData = {
                         inv: slotElement.dataset.inventory || '',
-                        ad_campaign: creative.dataset.adCampaign || slotData.ad_campaign,
-                        ad_creative: creative.dataset.adCreative || slotData.ad_creative,
+                        ad_campaign: creative.dataset.adCampaign || slotElement.dataset.adCampaign || '',
+                        ad_creative: creative.dataset.adCreative || '',
                     };
+
+                    if (pageCategories.length > 0) {
+                        pageCategories.forEach(cat => sendEvent('ad_request', { ...creativeData, cat: cat }));
+                    } else {
+                        sendEvent('ad_request', creativeData);
+                    }
+
                     observeVisibility(creative, creativeData);
                 });
-            } else if (isStickyOrFixed) {
-                sendEvent('ad_showed', slotData);
             } else {
-                observeVisibility(slotElement, slotData);
+                const slotData = {
+                    inv: slotElement.dataset.inventory || '',
+                    ad_campaign: slotElement.dataset.adCampaign || '',
+                    ad_creative: slotElement.dataset.adCreative || '',
+                };
+
+                if (pageCategories.length > 0) {
+                    pageCategories.forEach(cat => sendEvent('ad_request', { ...slotData, cat: cat }));
+                } else {
+                    sendEvent('ad_request', slotData);
+                }
+
+                const positionStyle = window.getComputedStyle(slotElement).position;
+                const isStickyOrFixed = positionStyle === 'sticky' || positionStyle === 'fixed';
+                if (isStickyOrFixed) {
+                    if (pageCategories.length > 0) {
+                        pageCategories.forEach(cat => sendEvent('ad_showed', { ...slotData, cat: cat }));
+                    } else {
+                        sendEvent('ad_showed', slotData);
+                    }
+                } else {
+                    observeVisibility(slotElement, slotData);
+                }
             }
         }
         document.querySelectorAll('.adopspot').forEach(processAdSlot);
     }
 
-    // --- Execution ---
+    // --- 3. Execution ---
     initializeGtag();
     trackPageview();
-
     window.addEventListener('load', () => {
         const currentDomain = window.location.hostname.replace('www.', '');
         if (currentDomain === 'thestandard.co' && theStandardHandler()) {
