@@ -4,7 +4,7 @@
  */
 (function() {
     // To update in the future, just change the version number here
-    var coreTrackerVersion = 'v18.0.1'; 
+    var coreTrackerVersion = 'v18.1.0'; 
 
     var script = document.createElement('script');
     script.async = true;
