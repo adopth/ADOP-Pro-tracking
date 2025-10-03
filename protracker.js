@@ -43,7 +43,8 @@
 
     // ฟังก์ชันพิเศษสำหรับ The Standard
     function theStandardHandler() {
-        const container = document.querySelector('.-banner-AdMasthead');
+        // const container = document.querySelector('.-banner-AdMasthead');
+        const container = document.querySelector('.banner-slider');
         if (!container) return;
 
         const campaignContainer = container.querySelector('.adsMasthead');
